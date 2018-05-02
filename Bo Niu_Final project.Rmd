@@ -1,0 +1,132 @@
+---
+title: "Bo Niu_Final project"
+author: "Bo Niu"
+date: "2018/5/2"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(data.table)
+library(countrycode)
+library(plotly)
+library(highcharter)
+library(leaflet)
+library(ggplot2)
+```
+#In my final project, I'm planning to study on starbucks stores' locations and find out some distribution pattern from them.
+
+First, Let's take a look on our dataset. I found it includes 13 variables of starbucks stores and I made their names in formal way.
+```{r ,echo=FALSE}
+starbucks <- read.csv("/Users/guoyx/Downloads/directory.csv")
+str(starbucks)
+summary(starbucks)
+names(starbucks)
+colnames(starbucks) <- make.names(colnames(starbucks))
+names(starbucks)
+```
+
+Then I counted the number of starbucks stores in each country and created a histogram of top 20 countries by using plotly package. It shows United States has the most starbucks stores and it represents about 50% of all. China(10.68%),Canada(5.73%), Japan(4.83%) and Korea(3.88%) are the top5 countries.
+```{r }
+sta_count <- starbucks %>%
+  group_by(Country) %>%
+  summarise(Counts =n()) %>%
+  arrange(desc(Counts))
+percent <- round(sta_count$Counts / sum(sta_count$Counts) * 100, 2)
+sta_count <- transform(sta_count, Percent = paste0(percent, '%'))
+
+names(sta_count)[1] <- 'iso2'
+sta_count$iso2 <- factor(sta_count$iso2, levels = sta_count$iso2)
+
+plot_ly(data = sta_count[1:20, ],
+       type = 'bar', 
+       hoverinfo = 'text',
+       x = ~ iso2,
+       y = ~ Counts,
+       text = ~paste(iso2, " counts  : ", Counts, 
+                     " percent: ", Percent))
+```
+
+To be more intuitive, I put the result to the map.
+
+```{r }
+data(worldgeojson, package = "highcharter")
+
+highchart() %>%
+ hc_add_series_map(worldgeojson, sta_count, value = "Counts", joinBy = "iso2")
+```
+
+Let's take a look on starbucks worldwride distribution. I use leaflet and add circles to each stores by their locations. green for US, yellow for UK, red for China, pink for Canada, blue for Japan and grey for other countries
+
+```{r }
+sta_us <- starbucks[starbucks$Country == 'US', ]
+sta_cn <- starbucks[starbucks$Country == 'CN', ]
+sta_ca <- starbucks[starbucks$Country == 'CA', ]
+sta_jp <- starbucks[starbucks$Country == 'JP', ]
+sta_gb <- starbucks[starbucks$Country == 'GB', ]
+sta_ot <- starbucks[!starbucks$Country %in% c('US', 'CN', 'CA', 'JP', 'GB'), ]
+
+leaflet() %>% 
+  addTiles() %>% 
+  addCircles(lat= sta_us$Latitude, lng = sta_us$Longitude, 
+             color = "green", weight = 1) %>% 
+  
+  addCircles(lat= sta_cn$Latitude, lng = sta_cn$Longitude, 
+             color = "red", weight = 1) %>% 
+  
+  addCircles(lat= sta_ca$Latitude, lng = sta_ca$Longitude, 
+             color = "pink", weight = 1) %>% 
+  
+  addCircles(lat= sta_jp$Latitude, lng = sta_jp$Longitude, 
+             color = "blue", weight = 1) %>%
+  
+  addCircles(lat= sta_gb$Latitude, lng = sta_gb$Longitude, 
+             color = "yellow", weight = 1) %>%
+  
+  addCircles(lat= sta_ot$Latitude, lng = sta_ot$Longitude, 
+             color = "grey", weight = 1)
+```
+
+As can be seen above, in United States, starbucks stores are mainly located in west and east coast; for China, starbucks stores are concentrated in coastal cities. I guess it's beacuse of big cities there. Such as Seattle, San Francisco and Los Angeles on west coast and Boston, New York and Washington on esat coast.
+
+
+To prove that, I count the top 20 cities with most starbucks stores
+
+```{r }
+city_count <- 
+ starbucks %>%
+ group_by(City) %>%
+ summarise(Counts = n()) %>%
+ arrange(desc(Counts))
+
+ggplot(city_count[1:20, ], 
+      aes(x = reorder(City, Counts), y = Counts, fill = City)) +
+ geom_bar(stat = 'identity') +
+ labs(x = 'City', y = 'Counts') +
+ theme_minimal() +
+ guides(fill = 'none') +
+ coord_flip()
+```
+
+From the result, we can see that the city with most starbucks stores is Shanghai. It's a big city as known as the global financial centre and transport hub in China. It provide a strong evidence that big city have more starbucks stores.
+
+
+Count US cities
+```{r }
+us_city_count <- 
+ sta_us %>% 
+ group_by(City) %>% 
+ summarise(Counts = n()) %>%
+ arrange(desc(Counts))
+
+ggplot(us_city_count[1:20, ], 
+      aes(x = reorder(City, Counts), y = Counts, fill = City)) +
+ geom_bar(stat = 'identity') +
+ labs(x = 'City', y = 'Counts') +
+ theme_minimal() +
+ guides(fill = 'none') +
+ coord_flip()
+```
+
+For US，according to the result, I guess starbucks are more willing to open stores in big coastal cities.
